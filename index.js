@@ -33,6 +33,7 @@ async function run() {
         // Connect to the "database"
         const database = client.db(process.env.DB_NAME);
         const jobsCollection = database.collection("jobs");
+        const companiesCollection = database.collection("companies");
 
         app.get('/', (req, res) => {
             res.send('Hello World!');
@@ -41,7 +42,59 @@ async function run() {
         // add new job;
         app.post('/api/jobs', async(req, res) => {
             const job = req.body;
-            const result = await jobsCollection.insertOne(job);
+            const newJob = {
+                ...job,
+                createdAt: new Date()
+            }
+            const result = await jobsCollection.insertOne(newJob);
+            res.send(result)
+        })
+
+
+        // get jobs
+        app.get('/api/jobs', async(req,res) =>{
+            const {companyId, status} = req.query;
+            const query = {};
+            if(companyId){
+                query.companyId= companyId;
+            }
+            if(status){
+                query.status= status;
+            }
+            const findJobs = await jobsCollection.find(query).toArray();
+              if(findJobs.length===0){
+                return res.status(404).send({message:"no job found"})
+            }
+            res.send(findJobs)
+        })
+
+
+      /**--------------------Company related apis------------------- */
+
+        // create a new company;
+        app.post('/api/my-companies', async(req, res) =>{
+            const company = req.body;
+            const newCompany = {
+                ...company,
+                createdAt: new Date(),
+            }
+            const result = await companiesCollection.insertOne(newCompany);
+            res.send(result)
+        })
+
+        // ger recruiter companies;
+        app.get("/api/my-companies", async (req, res) =>{
+            const {recruiterId} = req.query;
+            const query = {};
+            if(recruiterId){
+                query.recruiterId = recruiterId;
+            }
+
+            const result = await companiesCollection.findOne(query);
+            console.log('result', result)
+            if(!result){
+                return res.send({status:404, message:"no company found"})
+            }
             res.send(result)
         })
 
