@@ -40,7 +40,7 @@ async function run() {
         });
 
         // add new job;
-        app.post('/api/jobs', async(req, res) => {
+        app.post('/api/jobs', async (req, res) => {
             const job = req.body;
             const newJob = {
                 ...job,
@@ -52,27 +52,56 @@ async function run() {
 
 
         // get jobs
-        app.get('/api/jobs', async(req,res) =>{
-            const {companyId, status} = req.query;
+        app.get('/api/jobs', async (req, res) => {
+            const { companyId, status } = req.query;
             const query = {};
-            if(companyId){
-                query.companyId= companyId;
+            if (companyId) {
+                query.companyId = companyId;
             }
-            if(status){
-                query.status= status;
+            if (status) {
+                query.status = status;
             }
             const findJobs = await jobsCollection.find(query).toArray();
-              if(findJobs.length===0){
-                return res.status(404).send({message:"no job found"})
+            if (findJobs.length === 0) {
+                return res.status(404).send({ message: "no job found" })
             }
             res.send(findJobs)
         })
 
+        // get all jobs with filtering and search;
+        app.get('/api/filtering-jobs', async (req, res) => {
+            const { search, category, jobType, isRemote} = req.query;
+            const query = {};
+            console.log('query', req.query)
 
-      /**--------------------Company related apis------------------- */
+            if (search) {
+                query.$or = [
+                    { jobTitle: { $regex: search, $options: "i" } },
+                    { companyName: { $regex: search, $options: "i" } }
+                ];
+            }
+
+            if (category) {
+                query.jobCategory = category;
+            }
+            if (jobType) {
+                query.jobType = jobType;
+            }
+            if (isRemote) {
+                query.isRemote = isRemote=== 'true';
+            }
+
+            const findJobs = await jobsCollection.find(query).toArray();
+            console.log('findJobs', findJobs)
+
+            res.send(findJobs || [])
+        })
+
+
+        /**--------------------Company related apis------------------- */
 
         // create a new company;
-        app.post('/api/my-companies', async(req, res) =>{
+        app.post('/api/my-companies', async (req, res) => {
             const company = req.body;
             const newCompany = {
                 ...company,
@@ -83,17 +112,17 @@ async function run() {
         })
 
         // ger recruiter companies;
-        app.get("/api/my-companies", async (req, res) =>{
-            const {recruiterId} = req.query;
+        app.get("/api/my-companies", async (req, res) => {
+            const { recruiterId } = req.query;
             const query = {};
-            if(recruiterId){
+            if (recruiterId) {
                 query.recruiterId = recruiterId;
             }
 
             const result = await companiesCollection.findOne(query);
             console.log('result', result)
-            if(!result){
-                return res.send({status:404, message:"no company found"})
+            if (!result) {
+                return res.send({ status: 404, message: "no company found" })
             }
             res.send(result)
         })
