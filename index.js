@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
 
 
@@ -38,6 +38,9 @@ async function run() {
         app.get('/', (req, res) => {
             res.send('Hello World!');
         });
+
+
+        /** -----------------jobs related apis------------------- */
 
         // add new job;
         app.post('/api/jobs', async (req, res) => {
@@ -92,9 +95,17 @@ async function run() {
             }
 
             const findJobs = await jobsCollection.find(query).toArray();
-            console.log('findJobs', findJobs)
-
             res.send(findJobs || [])
+        })
+
+
+        // get single job  for jobDetailPage;
+        app.get('/api/jobs/:id', async(req, res)=>{
+            const {id} = req.params;
+            const result = await jobsCollection.findOne(
+                {_id: new ObjectId(id)}
+            )
+            res.send(result|| {})
         })
 
 
