@@ -34,6 +34,7 @@ async function run() {
         const database = client.db(process.env.DB_NAME);
         const jobsCollection = database.collection("jobs");
         const companiesCollection = database.collection("companies");
+        const applicationsCollection = database.collection("applications");
 
         app.get('/', (req, res) => {
             res.send('Hello World!');
@@ -73,7 +74,7 @@ async function run() {
 
         // get all jobs with filtering and search;
         app.get('/api/filtering-jobs', async (req, res) => {
-            const { search, category, jobType, isRemote} = req.query;
+            const { search, category, jobType, isRemote } = req.query;
             const query = {};
             console.log('query', req.query)
 
@@ -91,21 +92,35 @@ async function run() {
                 query.jobType = jobType;
             }
             if (isRemote) {
-                query.isRemote = isRemote=== 'true';
+                query.isRemote = isRemote === 'true';
             }
 
             const findJobs = await jobsCollection.find(query).toArray();
             res.send(findJobs || [])
         })
 
-
         // get single job  for jobDetailPage;
-        app.get('/api/jobs/:id', async(req, res)=>{
-            const {id} = req.params;
+        app.get('/api/jobs/:id', async (req, res) => {
+            const { id } = req.params;
             const result = await jobsCollection.findOne(
-                {_id: new ObjectId(id)}
+                { _id: new ObjectId(id) }
             )
-            res.send(result|| {})
+            res.send(result || {})
+        })
+
+
+        /** -----------------applications related apis------------------- */
+        
+        // add new application;
+        app.post('/api/application', async (req, res) =>{
+             const application = req.body;
+              const newApplication ={
+                ...application,
+                createdAt:new Date(),
+            }
+            const result = await applicationsCollection.insertOne(newApplication);
+           
+            res.send(result)
         })
 
 
