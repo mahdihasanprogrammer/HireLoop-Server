@@ -111,6 +111,22 @@ async function run() {
 
         /** -----------------applications related apis------------------- */
         
+        // get application with verify by applicant id;
+        app.get('/api/applications', async(req, res) =>{
+            const {applicantId, jobId} = req.query;
+            const query = {};
+
+            if(applicantId) {
+                query.applicantId = applicantId
+            }
+            if(jobId) {
+                query.jobId = jobId
+            }
+
+            const result = await applicationsCollection.find(query).toArray();
+            res.send(result)
+        })
+
         // add new application;
         app.post('/api/application', async (req, res) =>{
              const application = req.body;
