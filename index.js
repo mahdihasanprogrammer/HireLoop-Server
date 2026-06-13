@@ -35,6 +35,9 @@ async function run() {
         const jobsCollection = database.collection("jobs");
         const companiesCollection = database.collection("companies");
         const applicationsCollection = database.collection("applications");
+        const plansCollection = database.collection('plans');
+        const subscriptionsCollection = database.collection('subscriptions');
+        const userCollection = database.collection('user');
 
         app.get('/', (req, res) => {
             res.send('Hello World!');
@@ -109,7 +112,7 @@ async function run() {
         })
 
 
-        /** -----------------applications related apis------------------- */
+        /** -----------------applications related apis---------------- */
         
         // get application with verify by applicant id;
         app.get('/api/applications', async(req, res) =>{
@@ -167,6 +170,42 @@ async function run() {
                 return res.send({ status: 404, message: "no company found" })
             }
             res.send(result)
+        })
+
+
+          /** ----------------Plans related apis---------------- */
+
+          app.get('/api/plans', async (req, res) =>{
+            const query ={};
+            if(req.query.planId){
+                query.planId = req.query.planId
+            }
+
+            const result = await plansCollection.findOne(query);
+            res.send(result )
+          })
+
+
+        //   subscription related apis ;
+
+        app.post('/api/subscriptions', async(req, res) =>{
+            const subscriptionData = req.body;
+            const newSubscription = {
+                ...subscriptionData, 
+                createdAt: new Date()
+            }
+            const result = await subscriptionsCollection.insertOne(newSubscription)
+
+            // update the user plan information
+            const filter = {email:subscriptionData.email};
+            const updateDocument = {
+                $set:{
+                    plan: subscriptionData.planId
+                }
+            }
+
+            const updateResult = await userCollection.updateOne(filter, updateDocument)
+            res.send(updateDocument, updateResult)
         })
 
         // Send a ping to confirm a successful connection
