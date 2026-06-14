@@ -113,32 +113,32 @@ async function run() {
 
 
         /** -----------------applications related apis---------------- */
-        
+
         // get application with verify by applicant id;
-        app.get('/api/applications', async(req, res) =>{
-            const {applicantId, jobId} = req.query;
+        app.get('/api/applications', async (req, res) => {
+            const { applicantId, jobId } = req.query;
             const query = {};
 
-            if(applicantId) {
+            if (applicantId) {
                 query.applicantId = applicantId
             }
-            if(jobId) {
+            if (jobId) {
                 query.jobId = jobId
             }
 
-            const result = await applicationsCollection.find(query).toArray();
+            const result = await applicationsCollection.find(query).sort({ createdAt: -1 }).toArray();
             res.send(result)
         })
 
         // add new application;
-        app.post('/api/application', async (req, res) =>{
-             const application = req.body;
-              const newApplication ={
+        app.post('/api/application', async (req, res) => {
+            const application = req.body;
+            const newApplication = {
                 ...application,
-                createdAt:new Date(),
+                createdAt: new Date(),
             }
             const result = await applicationsCollection.insertOne(newApplication);
-           
+
             res.send(result)
         })
 
@@ -146,7 +146,7 @@ async function run() {
         /**--------------------Company related apis------------------- */
 
         // create a new company;
-        app.post('/api/my-companies', async (req, res) => {
+        app.post('/api/company', async (req, res) => {
             const company = req.body;
             const newCompany = {
                 ...company,
@@ -156,7 +156,13 @@ async function run() {
             res.send(result)
         })
 
-        // ger recruiter companies;
+        // get all companies for admin;
+        app.get('/api/companies', async (req, res) => {
+            const allCompany = await companiesCollection.find().toArray();
+            res.send(allCompany)
+        })
+
+        // get recruiter companies;
         app.get("/api/my-companies", async (req, res) => {
             const { recruiterId } = req.query;
             const query = {};
@@ -165,41 +171,52 @@ async function run() {
             }
 
             const result = await companiesCollection.findOne(query);
-            console.log('result', result)
-            if (!result) {
-                return res.send({ status: 404, message: "no company found" })
+
+
+            res.send(result || {})
+        })
+
+        // update company status by admin;
+        app.patch('/api/companies/:id', async (req, res) => {
+            const { id } = req.params;
+            const updateCompany = req.body;
+            const query = { _id: new ObjectId(id) };
+            const updateDoc = {
+                $set: { status : updateCompany.status }
             }
+            const result = await companiesCollection.updateOne(query, updateDoc)
+
             res.send(result)
         })
 
 
-          /** ----------------Plans related apis---------------- */
+        /** ----------------Plans related apis---------------- */
 
-          app.get('/api/plans', async (req, res) =>{
-            const query ={};
-            if(req.query.planId){
+        app.get('/api/plans', async (req, res) => {
+            const query = {};
+            if (req.query.planId) {
                 query.planId = req.query.planId
             }
 
             const result = await plansCollection.findOne(query);
-            res.send(result )
-          })
+            res.send(result)
+        })
 
 
         //   subscription related apis ;
 
-        app.post('/api/subscriptions', async(req, res) =>{
+        app.post('/api/subscriptions', async (req, res) => {
             const subscriptionData = req.body;
             const newSubscription = {
-                ...subscriptionData, 
+                ...subscriptionData,
                 createdAt: new Date()
             }
             const result = await subscriptionsCollection.insertOne(newSubscription)
 
             // update the user plan information
-            const filter = {email:subscriptionData.email};
+            const filter = { email: subscriptionData.email };
             const updateDocument = {
-                $set:{
+                $set: {
                     plan: subscriptionData.planId
                 }
             }
