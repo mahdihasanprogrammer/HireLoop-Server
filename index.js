@@ -1,14 +1,14 @@
-const express = require('express');
-const cors = require('cors');
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-require('dotenv').config();
+const express = require('express')
+const cors = require('cors')
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
+require('dotenv').config()
 
 
-const app = express();
+const app = express()
 const port = 6500;
 
 // Middleware
-app.use(express.json());
+app.use(express.json())
 app.use(cors())
 
 // MongoDB URI
@@ -24,6 +24,7 @@ const client = new MongoClient(uri, {
     }
 });
 
+
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
@@ -38,6 +39,55 @@ async function run() {
         const plansCollection = database.collection('plans');
         const subscriptionsCollection = database.collection('subscriptions');
         const userCollection = database.collection('user');
+        const sessionCollection = database.collection('session')
+
+        
+// middleware, 
+const verifyToken = async (req, res, next) =>{
+    const authHeader = req.headers?.authorization;
+    
+    if(!authHeader){
+      return  res.status(401).send({message:'Unauthorized access'})
+    }
+
+    const token = authHeader.split(' ')[1];
+   
+    if(!token){
+        return  res.status(401).send({message:'Unauthorized access'})
+    }
+    const query = {token: token}
+    
+    const session = await sessionCollection.findOne(query);
+    const userId = session?.userId
+    const user = await userCollection.findOne({
+        _id:userId
+    });
+    req.user = user;
+    next()
+}
+
+
+// must be used after verifyToken middleware;
+const verifyAdmin = async(req, res, next) =>{
+    if(req.user.role !== 'admin'){
+        return res.status(403).send({message: "Forbidden"})
+    }
+    next()
+}
+
+const verifySeeker = async(req, res, next)=>{
+    if(req.user.role !== "seeker"){
+        return res.status(403).send({message: "Forbidden"})
+    }
+    next()
+}
+
+const verifyRecruiter = async(req, res, next)=>{
+    if(req.user.role !== "recruiter"){
+        return res.status(403).send({message : "Forbidden"})
+    }
+    next()
+}
 
         app.get('/', (req, res) => {
             res.send('Hello World!');
@@ -65,13 +115,12 @@ async function run() {
             if (companyId) {
                 query.companyId = companyId;
             }
-            if (status) {
-                query.status = status;
-            }
+            // console.log('companyid', companyId)
+            // if (status) {
+            //     query.status = status;
+            // }
             const findJobs = await jobsCollection.find(query).toArray();
-            if (findJobs.length === 0) {
-                return res.status(404).send({ message: "no job found" })
-            }
+
             res.send(findJobs)
         })
 
@@ -115,12 +164,16 @@ async function run() {
         /** -----------------applications related apis---------------- */
 
         // get application with verify by applicant id;
-        app.get('/api/applications', async (req, res) => {
+        app.get('/api/applications',verifyToken, verifySeeker, async (req, res) => {
             const { applicantId, jobId } = req.query;
             const query = {};
 
-            if (applicantId) {
-                query.applicantId = applicantId
+          
+            if (applicantId ) {
+                query.applicantId = applicantId;
+                if(applicantId !== req.user._id.toString()){
+                    return res.status(403).send({message: "Forbidden access"})
+                }
             }
             if (jobId) {
                 query.jobId = jobId
@@ -157,9 +210,64 @@ async function run() {
         })
 
         // get all companies for admin;
-        app.get('/api/companies', async (req, res) => {
-            const allCompany = await companiesCollection.find().toArray();
+
+        // inefficient way to join or aggregate collection
+        app.get('/api/companies', verifyToken, verifyAdmin, async (req, res) => {
+            const pipeline =[
+                {$sort:{createdAt: -1}},
+                {$limit : 8}
+                
+            ]
+            const cursor = companiesCollection.aggregate(pipeline);
+            const allCompany = await cursor.toArray()
+
+            for(company of allCompany){
+                const jobsCount = await jobsCollection.countDocuments({companyId : company._id.toString()})
+                company.jobsCount = jobsCount
+            }
             res.send(allCompany)
+        })
+
+
+        // app.get('/api/companies', async (req, res) => {
+        //     const pipeline = [
+        //         { $sort: { createdAt: -1 } },
+        //         { $limit: 8 }
+        //     ]
+
+        //     const cursor = companiesCollection.aggregate(pipeline)
+        //     const result = await cursor.toArray()
+        //     res.send(result)
+        // })
+
+
+        // test purpose;
+        app.get('/api/stats', async (req, res) => {
+            const pipeline = [
+                {
+                    $group: {
+                        _id: "$jobType",
+                        count: {
+                            $sum: 1
+                        }
+                    }
+                },
+                {
+                    $project: {
+
+                        jobType: "$_id",
+                        count: 1,
+                        _id: 0,
+
+                    },
+
+                }
+                // { $sort: { count: 1 } }
+            ]
+
+            const cursor = jobsCollection.aggregate(pipeline)
+            const result = await cursor.toArray()
+            res.send(result)
         })
 
         // get recruiter companies;
@@ -177,12 +285,12 @@ async function run() {
         })
 
         // update company status by admin;
-        app.patch('/api/companies/:id', async (req, res) => {
+        app.patch('/api/companies/:id',verifyToken,verifyAdmin, async (req, res) => {
             const { id } = req.params;
             const updateCompany = req.body;
             const query = { _id: new ObjectId(id) };
             const updateDoc = {
-                $set: { status : updateCompany.status }
+                $set: { status: updateCompany.status }
             }
             const result = await companiesCollection.updateOne(query, updateDoc)
 
@@ -204,7 +312,6 @@ async function run() {
 
 
         //   subscription related apis ;
-
         app.post('/api/subscriptions', async (req, res) => {
             const subscriptionData = req.body;
             const newSubscription = {
